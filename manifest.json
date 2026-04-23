@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Code Tools",
+  "version": "1.0",
+  "description": "Hover copy button for inputs & format/wrap buttons for ACE editors.",
+  "author": "Luigi's Box Team - Sanekx Arcs",
+  "permissions": ["clipboardWrite", "storage", "tabs", "scripting", "activeTab"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["copy-content.js"],
+      "css": ["copy-content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["ace-bridge.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["ace-page.js"],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["ace-ext-beautify.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

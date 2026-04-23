@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 280px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 12px;
+      background: #161616;
+      color: #d4d4d4;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      padding: 12px 14px 0;
+    }
+    .header h3 { font-size: 13px; font-weight: 600; color: #fff; }
+
+    /* ── Tab bar ── */
+    .tab-bar {
+      display: flex;
+      margin: 10px 14px 0;
+      border-bottom: 1px solid #252525;
+    }
+    .tab-btn {
+      flex: 1; padding: 7px 0 6px;
+      background: none; border: none; border-bottom: 2px solid transparent;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+      color: #555; cursor: pointer; margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover { color: #aaa; }
+    .tab-btn.active { color: #fff; border-bottom-color: #3b82f6; }
+
+    /* ── Tab panels ── */
+    .tab-panel { display: none; padding: 14px 14px 0; }
+    .tab-panel.active { display: block; }
+
+    /* ── Panel header (feature name + toggle) ── */
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .panel-title { font-size: 12px; font-weight: 600; color: #bbb; }
+
+    /* ── Toggle ── */
+    .toggle-wrap { display: flex; align-items: center; gap: 7px; }
+    .toggle-label { font-size: 11px; color: #777; }
+    .toggle { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: #333; border-radius: 9px;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute; width: 12px; height: 12px;
+      background: #888; border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: #1d4ed8; }
+    .toggle input:checked + .toggle-track::after { transform: translateX(16px); background: #fff; }
+
+    /* ── Settings body (disabled state) ── */
+    .settings-body { transition: opacity 0.2s; }
+    .settings-body.disabled { opacity: 0.35; pointer-events: none; }
+
+    /* ── Section ── */
+    .section { margin-bottom: 13px; }
+    .section:last-child { margin-bottom: 0; }
+    .section-label {
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: #555; margin-bottom: 7px;
+    }
+
+    /* ── Wrap row ── */
+    .wrap-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 3px 0 12px;
+    }
+    .wrap-row-label { font-size: 12px; color: #aaa; }
+
+    /* ── Blocklist ── */
+    .block-row {
+      display: flex; align-items: center; gap: 6px;
+      background: #1e1e1e; border: 1px solid #2a2a2a;
+      border-radius: 5px; padding: 5px 8px; margin-bottom: 6px;
+    }
+    .block-row .hostname { flex: 1; font-size: 11px; color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-small {
+      flex-shrink: 0; font-size: 10px; padding: 2px 8px;
+      border: 1px solid #333; border-radius: 4px;
+      cursor: pointer; background: #2a2a2a; color: #ccc;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .btn-small:hover { background: #333; border-color: #555; }
+    .btn-small.active-block { background: #7f1d1d; border-color: #991b1b; color: #fca5a5; }
+
+    .blocked-item { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+    .blocked-item .bhost { flex: 1; font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; }
+    .blocked-list:empty::after { content: 'No sites blocked'; font-size: 11px; color: #444; display: block; padding: 2px 0; }
+
+    /* ── Selector list ── */
+    .selector-row { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
+    .selector-text {
+      flex: 1; font-size: 11px; color: #aaa;
+      background: #1e1e1e; border: 1px solid #2a2a2a;
+      border-radius: 4px; padding: 4px 7px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      outline: none; font-family: monospace;
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .selector-text:focus { border-color: #3b82f6; color: #fff; white-space: normal; overflow: visible; }
+
+    .add-row { display: flex; gap: 5px; }
+    .add-input {
+      flex: 1; font-size: 11px; color: #aaa;
+      background: #1e1e1e; border: 1px solid #2a2a2a;
+      border-radius: 4px; padding: 4px 7px;
+      outline: none; font-family: monospace;
+      transition: border-color 0.1s;
+    }
+    .add-input::placeholder { color: #3a3a3a; }
+    .add-input:focus { border-color: #3b82f6; color: #fff; }
+    .btn-add {
+      flex-shrink: 0; font-size: 11px; padding: 3px 10px;
+      border: 1px solid #2a2a2a; border-radius: 4px;
+      cursor: pointer; background: #222; color: #aaa;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+    }
+    .btn-add:hover { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+
+    /* ── Remove button ── */
+    .btn-remove {
+      flex-shrink: 0; background: none; border: none; color: #555;
+      cursor: pointer; font-size: 13px; line-height: 1; padding: 0 3px;
+      transition: color 0.1s;
+    }
+    .btn-remove:hover { color: #f87171; }
+
+    /* ── Shared appearance section ── */
+    .shared {
+      padding: 12px 14px 14px;
+      border-top: 1px solid #222;
+      margin-top: 2px;
+    }
+    .shared-label {
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: #444; margin-bottom: 10px;
+    }
+
+    /* ── Scan button ── */
+    .btn-scan {
+      width: 100%; padding: 6px 0; margin-bottom: 8px;
+      background: #1e1e1e; border: 1px solid #2a2a2a; border-radius: 5px;
+      color: #888; font-size: 11px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+    }
+    .btn-scan:hover { background: #252525; border-color: #3b82f6; color: #60a5fa; }
+    .btn-scan.scanning { color: #3b82f6; border-color: #3b82f6; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Discovered list ── */
+    #ace-discovered-wrap { margin-bottom: 8px; }
+    .discovered-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    .discovered-header-label { font-size: 10px; color: #555; }
+    .btn-add-all {
+      font-size: 10px; padding: 2px 8px;
+      border: 1px solid #2a2a2a; border-radius: 4px;
+      cursor: pointer; background: #222; color: #888;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+    }
+    .btn-add-all:hover { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+
+    .discovered-item {
+      display: flex; align-items: center; gap: 5px; margin-bottom: 3px;
+    }
+    .discovered-sel {
+      flex: 1; font-size: 11px; font-family: monospace;
+      color: #777; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .discovered-sel.already { color: #3a3a3a; }
+    .discovered-check { color: #3a3a3a; font-size: 11px; flex-shrink: 0; padding: 0 5px; }
+    .btn-add-single {
+      flex-shrink: 0; font-size: 10px; padding: 2px 7px;
+      border: 1px solid #2a2a2a; border-radius: 4px;
+      cursor: pointer; background: #222; color: #aaa;
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+    }
+    .btn-add-single:hover { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+    .scan-empty { font-size: 11px; color: #444; padding: 2px 0 6px; }
+    .discovered-group-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.07em; color: #444; margin: 6px 0 4px;
+    }
+    .discovered-divider { border-top: 1px solid #1e1e1e; margin: 6px 0; }
+
+    /* ── Position grid ── */
+    .pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+    .pos-cell {
+      height: 28px; border: 1px solid #2a2a2a; border-radius: 5px;
+      cursor: pointer; background: #222;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; color: #555;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+      user-select: none;
+    }
+    .pos-cell:hover:not(.empty) { background: #2e2e2e; border-color: #444; color: #bbb; }
+    .pos-cell.active { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+    .pos-cell.empty  { cursor: default; background: transparent; border-color: #1e1e1e; }
+
+    /* ── Sliders ── */
+    .slider-row { display: flex; align-items: center; gap: 8px; }
+    input[type="range"] {
+      -webkit-appearance: none; flex: 1; height: 4px;
+      border-radius: 2px; background: #333; outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: #3b82f6; cursor: pointer;
+      border: 2px solid #1d4ed8; transition: background 0.1s;
+    }
+    input[type="range"]:hover::-webkit-slider-thumb { background: #60a5fa; }
+    .slider-val { width: 38px; text-align: right; color: #888; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+    /* ── Preview ── */
+    .preview-wrap {
+      display: flex; align-items: center; gap: 10px; padding-top: 12px;
+    }
+    .preview-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.08em; flex: 1; }
+    .preview-btns { display: flex; gap: 3px; }
+    .preview-btn {
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);
+      cursor: default; flex-shrink: 0; color: rgba(255,255,255,0.85);
+    }
+    #preview-wrap-btn    { color: #60a5fa; border-color: rgba(96,165,250,0.5); }
+    #preview-expand-btn  { color: rgba(255,255,255,0.7); }
+
+    .divider { border: none; border-top: 1px solid #222; margin: 12px 0; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h3>Code Tools</h3>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="copy">Copy Button</button>
+    <button class="tab-btn" data-tab="ace">ACE Formatter</button>
+  </div>
+
+  <!-- ── Copy Button tab ── -->
+  <div class="tab-panel active" id="tab-copy">
+    <div class="panel-header">
+      <span class="panel-title">Copy Button</span>
+      <div class="toggle-wrap">
+        <span class="toggle-label" id="copy-toggle-label">ON</span>
+        <label class="toggle">
+          <input type="checkbox" id="copy-enabled" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-body" id="copy-settings-body">
+      <div class="section">
+        <div class="section-label">Site Blocklist</div>
+        <div class="block-row">
+          <span class="hostname" id="copy-current-site">—</span>
+          <button class="btn-small" id="copy-block-btn">Block</button>
+        </div>
+        <div class="blocked-list" id="copy-blocked-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ACE Formatter tab ── -->
+  <div class="tab-panel" id="tab-ace">
+    <div class="panel-header">
+      <span class="panel-title">ACE Formatter</span>
+      <div class="toggle-wrap">
+        <span class="toggle-label" id="ace-toggle-label">ON</span>
+        <label class="toggle">
+          <input type="checkbox" id="ace-enabled" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-body" id="ace-settings-body">
+      <div class="wrap-row">
+        <span class="wrap-row-label">Word Wrap Default</span>
+        <div class="toggle-wrap">
+          <span class="toggle-label" id="ace-wrap-label">ON</span>
+          <label class="toggle">
+            <input type="checkbox" id="ace-wrap" checked>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="wrap-row">
+        <span class="wrap-row-label">Auto-expand Height</span>
+        <div class="toggle-wrap">
+          <span class="toggle-label" id="ace-expand-label">OFF</span>
+          <label class="toggle">
+            <input type="checkbox" id="ace-auto-expand">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Site Blocklist</div>
+        <div class="block-row">
+          <span class="hostname" id="ace-current-site">—</span>
+          <button class="btn-small" id="ace-block-btn">Block</button>
+        </div>
+        <div class="blocked-list" id="ace-blocked-list"></div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="section">
+        <div class="section-label">ACE Editor Selectors</div>
+
+        <button class="btn-scan" id="ace-scan-btn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          Scan page for ACE editors
+        </button>
+
+        <div id="ace-discovered-wrap" style="display:none">
+          <div class="discovered-header">
+            <span class="discovered-header-label" id="ace-discovered-label">Found on page</span>
+            <button class="btn-add-all" id="ace-add-all-btn">Add all new</button>
+          </div>
+          <div id="ace-discovered-list"></div>
+        </div>
+
+        <div id="ace-selector-list"></div>
+        <div class="add-row">
+          <input class="add-input" id="ace-add-input" type="text" placeholder="#editor-id or .css-selector" spellcheck="false">
+          <button class="btn-add" id="ace-add-btn">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Shared appearance (always visible) ── -->
+  <div class="shared">
+    <div class="shared-label">Appearance — all buttons</div>
+
+    <div class="section">
+      <div class="section-label">Position</div>
+      <div class="pos-grid" id="pos-grid">
+        <div class="pos-cell" data-pos="top-left">↖</div>
+        <div class="pos-cell" data-pos="top-center">↑</div>
+        <div class="pos-cell" data-pos="top-right">↗</div>
+        <div class="pos-cell" data-pos="left-center">←</div>
+        <div class="pos-cell empty"></div>
+        <div class="pos-cell" data-pos="right-center">→</div>
+        <div class="pos-cell" data-pos="bottom-left">↙</div>
+        <div class="pos-cell" data-pos="bottom-center">↓</div>
+        <div class="pos-cell" data-pos="bottom-right">↘</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Opacity</div>
+      <div class="slider-row">
+        <input type="range" id="opacity" min="10" max="100" step="5">
+        <span class="slider-val" id="opacity-val">70%</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Button Size</div>
+      <div class="slider-row">
+        <input type="range" id="size" min="18" max="44" step="2">
+        <span class="slider-val" id="size-val">26px</span>
+      </div>
+    </div>
+
+    <div class="preview-wrap">
+      <span class="preview-label">Preview</span>
+      <div class="preview-btns">
+        <div class="preview-btn" id="preview-copy-btn"></div>
+        <div class="preview-btn" id="preview-fmt-btn"></div>
+        <div class="preview-btn" id="preview-wrap-btn"></div>
+        <div class="preview-btn" id="preview-expand-btn"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
