@@ -123,18 +123,33 @@
     const n     = toolbar.childElementCount;
     const tw    = s * n + 3 * (n - 1); // n buttons + (n-1) gaps of 3px
     const off   = 4;
+    const vh    = window.innerHeight;
     let top, left;
 
+    // Clamp vertical position if editor is taller than viewport
+    let effectiveTop = rect.top;
+    let effectiveBottom = rect.bottom;
+
+    if (rect.height > vh) {
+      effectiveTop = Math.max(rect.top, 0);
+      effectiveBottom = Math.min(rect.bottom, vh);
+      // Ensure there's enough space for the toolbar
+      if (effectiveBottom - effectiveTop < s + off * 2) {
+        if (rect.top > 0) effectiveTop = rect.top;
+        else if (rect.bottom < vh) effectiveTop = rect.bottom - s - off * 2;
+      }
+    }
+
     switch (settings.position) {
-      case 'top-left':      top = rect.top    + off;                    left = rect.left  + off;           break;
-      case 'top-center':    top = rect.top    + off;                    left = rect.left  + (rect.width  - tw) / 2; break;
-      case 'top-right':     top = rect.top    + off;                    left = rect.right - tw - off;      break;
-      case 'left-center':   top = rect.top    + (rect.height - s) / 2; left = rect.left  + off;           break;
-      case 'right-center':  top = rect.top    + (rect.height - s) / 2; left = rect.right - tw - off;      break;
-      case 'bottom-left':   top = rect.bottom - s - off;               left = rect.left  + off;           break;
-      case 'bottom-center': top = rect.bottom - s - off;               left = rect.left  + (rect.width  - tw) / 2; break;
-      case 'bottom-right':  top = rect.bottom - s - off;               left = rect.right - tw - off;      break;
-      default:              top = rect.top    + off;                    left = rect.right - tw - off;
+      case 'top-left':      top = effectiveTop    + off;                    left = rect.left  + off;           break;
+      case 'top-center':    top = effectiveTop    + off;                    left = rect.left  + (rect.width  - tw) / 2; break;
+      case 'top-right':     top = effectiveTop    + off;                    left = rect.right - tw - off;      break;
+      case 'left-center':   top = (effectiveTop + effectiveBottom - s) / 2; left = rect.left  + off;           break;
+      case 'right-center':  top = (effectiveTop + effectiveBottom - s) / 2; left = rect.right - tw - off;      break;
+      case 'bottom-left':   top = effectiveBottom - s - off;               left = rect.left  + off;           break;
+      case 'bottom-center': top = effectiveBottom - s - off;               left = rect.left  + (rect.width  - tw) / 2; break;
+      case 'bottom-right':  top = effectiveBottom - s - off;               left = rect.right - tw - off;      break;
+      default:              top = effectiveTop    + off;                    left = rect.right - tw - off;
     }
 
     toolbar.style.top  = top  + 'px';

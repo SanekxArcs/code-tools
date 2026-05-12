@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Code Tools",
-  "version": "1.0",
+  "version": "1.0.1",
   "description": "Hover copy button for inputs & format/wrap buttons for ACE editors.",
   "author": "Luigi's Box Team - Sanekx Arcs",
   "permissions": ["clipboardWrite", "storage", "tabs", "scripting", "activeTab"],
