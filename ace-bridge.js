@@ -22,6 +22,7 @@
     position: 'top-right',
     opacity:  70,
     size:     26,
+    css_validate_enabled: true,
   };
 
   function syncSettings(raw) {
@@ -42,6 +43,7 @@
       position:    raw.position,
       opacity:     raw.opacity,
       size:        raw.size,
+      cssValidate: raw.css_validate_enabled,
     });
     el.dataset.extUrl = chrome.runtime.getURL('');
     document.dispatchEvent(new CustomEvent('__acefmt:update'));

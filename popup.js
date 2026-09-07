@@ -25,6 +25,7 @@ const DEFAULTS = {
     '#custom-template-1', '#custom-template-2',
   ],
   ace_blacklist: [],
+  css_validate_enabled: true,
 };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -53,6 +54,14 @@ const aceCurrentSite  = document.getElementById('ace-current-site');
 const aceBlockBtn     = document.getElementById('ace-block-btn');
 const aceBlockedList  = document.getElementById('ace-blocked-list');
 const aceSelectorList    = document.getElementById('ace-selector-list');
+
+// CSS Validator tab
+const cssEnabledChk   = document.getElementById('css-enabled');
+const cssToggleLabel  = document.getElementById('css-toggle-label');
+const cssSettingsBody = document.getElementById('css-settings-body');
+// ACE tab — CSS Validator shortcut toggle
+const aceCssValidateChk   = document.getElementById('ace-css-validate');
+const aceCssValLabel      = document.getElementById('ace-css-val-label');
 const aceAddInput        = document.getElementById('ace-add-input');
 const aceAddBtn          = document.getElementById('ace-add-btn');
 const aceScanBtn         = document.getElementById('ace-scan-btn');
@@ -506,6 +515,28 @@ aceBlockBtn.addEventListener('click', () => {
 aceAddBtn.addEventListener('click', addSelector);
 aceAddInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addSelector(); });
 
+// ── CSS Validator helpers ─────────────────────────────────────────────────────
+
+function updateCssToggleUI(enabled) {
+  cssToggleLabel.textContent = enabled ? 'ON' : 'OFF';
+  cssSettingsBody.classList.toggle('disabled', !enabled);
+  aceCssValLabel.textContent = enabled ? 'ON' : 'OFF';
+  aceCssValidateChk.checked = !!enabled;
+}
+
+cssEnabledChk.addEventListener('change', () => {
+  const en = cssEnabledChk.checked;
+  updateCssToggleUI(en);
+  chrome.storage.sync.set({ css_validate_enabled: en });
+});
+
+aceCssValidateChk.addEventListener('change', () => {
+  const en = aceCssValidateChk.checked;
+  cssEnabledChk.checked = en;
+  updateCssToggleUI(en);
+  chrome.storage.sync.set({ css_validate_enabled: en });
+});
+
 // ── Load all state ────────────────────────────────────────────────────────────
 
 chrome.storage.sync.get(DEFAULTS, (s) => {
@@ -527,6 +558,10 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
   updateAceAutoExpandUI(s.ace_autoExpand);
   renderAceBlockedList();
   renderSelectors();
+
+  // CSS Validator tab
+  cssEnabledChk.checked = !!s.css_validate_enabled;
+  updateCssToggleUI(s.css_validate_enabled);
 
   // Shared appearance
   setActivePos(s.position);

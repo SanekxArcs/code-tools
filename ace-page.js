@@ -12,6 +12,8 @@
   const SVG_EXPAND   = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:100%;height:100%"><path d="M19 3H5"/><path d="M12 21V7"/><path d="m6 15 6 6 6-6"/></svg>`;
   // Collapse back to default height
   const SVG_COLLAPSE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:100%;height:100%"><path d="M5 21h14"/><path d="M12 3v14"/><path d="m18 9-6-6-6 6"/></svg>`;
+  // CSS Validate (shield + checkmark)
+  const SVG_VALIDATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;width:100%;height:100%"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`;
 
   let settings = null;
   let beautify  = null;
@@ -62,6 +64,115 @@
       const editor = ace.edit(el);
       return (editor && editor.session) ? editor : null;
     } catch (_) { return null; }
+  }
+
+  // ── CSS detection & validation ──────────────────────────────────────────────
+
+  function isCssEditor(el, editor) {
+    if ((el.id || '').toLowerCase().includes('css')) return true;
+    try {
+      const modeId = editor.session.getMode().$id || '';
+      return modeId.includes('css');
+    } catch (_) { return false; }
+  }
+
+  function parseCssErrors(css) {
+    const errors = [];
+    if (!css.trim()) return errors;
+    const lines = css.split('\n');
+    let depth = 0, inComment = false, inStr = null;
+    const openBraceLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const lineNum = i + 1;
+      for (let j = 0; j < lines[i].length; j++) {
+        const ch = lines[i][j], nxt = lines[i][j + 1] ?? '';
+        if (inComment) { if (ch === '*' && nxt === '/') { inComment = false; j++; } continue; }
+        if (inStr)     { if (ch === inStr && lines[i][j - 1] !== '\\') inStr = null; continue; }
+        if (ch === '/' && nxt === '*') { inComment = true; j++; continue; }
+        if (ch === '"' || ch === "'") { inStr = ch; continue; }
+        if (ch === '{') { depth++; openBraceLines.push(lineNum); }
+        else if (ch === '}') {
+          if (depth <= 0) errors.push({ line: lineNum, message: 'Unexpected `}` \u2014 no matching `{`' });
+          else { depth--; openBraceLines.pop(); }
+        }
+      }
+    }
+    if (inComment) errors.push({ line: lines.length, message: 'Unclosed comment `/* ... */`' });
+    for (const l of [...openBraceLines]) errors.push({ line: l, message: 'Unclosed `{` \u2014 missing closing `}`' });
+
+    if (errors.length > 0) return errors.sort((a, b) => a.line - b.line);
+
+    let i = 0, rDepth = 0, rStart = -1, rStartLine = 1, curLine = 1;
+    let iC = false, iS = null;
+    const topRules = [];
+
+    while (i < css.length) {
+      const c = css[i], n = css[i + 1] ?? '';
+      if (c === '\n') { curLine++; i++; continue; }
+      if (iC) { if (c === '*' && n === '/') { iC = false; i++; } i++; continue; }
+      if (iS) { if (c === iS && css[i - 1] !== '\\') iS = null; i++; continue; }
+      if (c === '/' && n === '*') { iC = true; i += 2; continue; }
+      if (c === '"' || c === "'") { iS = c; i++; continue; }
+      if (c === '{') {
+        if (rDepth === 0) { rStart = i; rStartLine = curLine; }
+        rDepth++;
+      } else if (c === '}') {
+        rDepth--;
+        if (rDepth === 0 && rStart !== -1) {
+          let sel = rStart - 1;
+          while (sel > 0 && css[sel - 1] !== '\n' && css[sel - 1] !== '}') sel--;
+          topRules.push({ text: css.slice(sel, i + 1).trim(), startLine: rStartLine });
+          rStart = -1;
+        }
+      }
+      i++;
+    }
+
+    for (const { text, startLine } of topRules) {
+      try { new CSSStyleSheet().insertRule(text, 0); }
+      catch (e) {
+        const msg = String(e).replace(/^.*?(SyntaxError|Error):?\s*/i, '');
+        errors.push({ line: startLine, message: msg || String(e) });
+      }
+    }
+
+    return errors.sort((a, b) => a.line - b.line);
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+
+  function showToast(message, type, duration) {
+    duration = duration || 4000;
+    const TOAST_ID = '__acefmt_toast';
+    const KF_ID    = '__acefmt_toast_kf';
+    if (!document.getElementById(KF_ID)) {
+      const s = document.createElement('style');
+      s.id = KF_ID;
+      s.textContent = '@keyframes _afIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}@keyframes _afOut{from{transform:translateY(0);opacity:1}to{transform:translateY(10px);opacity:0}}';
+      document.head.appendChild(s);
+    }
+    document.getElementById(TOAST_ID)?.remove();
+    const bg   = type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : '#2563eb';
+    const icon = type === 'success' ? '✓'        : type === 'error' ? '✗'       : 'ℹ';
+    const t = document.createElement('div');
+    t.id = TOAST_ID;
+    Object.assign(t.style, {
+      position: 'fixed', bottom: '20px', right: '20px', zIndex: '2147483647',
+      background: bg, color: '#fff', padding: '9px 14px', borderRadius: '7px',
+      fontSize: '12px', fontWeight: '500',
+      fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+      boxShadow: '0 4px 20px rgba(0,0,0,0.35)', display: 'flex',
+      alignItems: 'center', gap: '9px', maxWidth: '380px',
+      animation: '_afIn 0.2s ease-out', lineHeight: '1.4',
+    });
+    const safe = message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    t.innerHTML = `<span style="font-size:14px;line-height:1;flex-shrink:0">${icon}</span><span>${safe}</span>`;
+    document.body.appendChild(t);
+    setTimeout(() => {
+      t.style.animation = '_afOut 0.2s ease-in forwards';
+      setTimeout(() => t.remove(), 210);
+    }, duration);
   }
 
   // ── Button helpers ────────────────────────────────────────────────────────
@@ -277,20 +388,80 @@
       exec: () => loadBeautify((b) => { if (b) b.beautify(editor.session); }),
     });
 
-    // Order: copy | format | wrap | expand
+    // ── CSS Validate button (CSS editors only) ──
+    let cssBtn = null;
+    if (isCssEditor(el, editor)) {
+      cssBtn = makeBtn(SVG_VALIDATE);
+      cssBtn.title = 'Validate CSS';
+      let cssErrors = null, errCursor = 0, cssResetTimer = null;
+
+      const resetCssBtn = () => {
+        if (!cssErrors) return;
+        cssErrors = null; errCursor = 0;
+        clearTimeout(cssResetTimer);
+        cssBtn.innerHTML = SVG_VALIDATE;
+        applyBtnStyle(cssBtn);
+        cssBtn.style.color       = 'rgba(255,255,255,0.85)';
+        cssBtn.style.borderColor = 'rgba(255,255,255,0.15)';
+        cssBtn.title = 'Validate CSS';
+      };
+
+      cssBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (cssErrors && cssErrors.length > 0) {
+          errCursor = (errCursor + 1) % cssErrors.length;
+          const err = cssErrors[errCursor];
+          editor.scrollToLine(err.line - 1, true, true);
+          editor.selection.moveCursorToPosition({ row: err.line - 1, column: 0 });
+          cssBtn.title = `Error ${errCursor + 1}/${cssErrors.length} — Line ${err.line}: ${err.message}`;
+          showToast(`Error ${errCursor + 1}/${cssErrors.length} — Line ${err.line}: ${err.message}`, 'error', 5000);
+        } else {
+          const css = editor.getValue();
+          const errs = parseCssErrors(css);
+          cssErrors = errs.length ? errs : null;
+          errCursor = 0;
+          clearTimeout(cssResetTimer);
+          if (!errs.length) {
+            cssBtn.innerHTML = SVG_VALIDATE;
+            applyBtnStyle(cssBtn);
+            cssBtn.style.color       = '#4ade80';
+            cssBtn.style.borderColor = 'rgba(74,222,128,0.5)';
+            cssBtn.title = 'CSS is valid ✓';
+            showToast('CSS is valid — no errors found ✓', 'success', 3000);
+            cssResetTimer = setTimeout(resetCssBtn, 3000);
+          } else {
+            const err = errs[0];
+            cssBtn.innerHTML = SVG_VALIDATE;
+            applyBtnStyle(cssBtn);
+            cssBtn.style.color       = '#f87171';
+            cssBtn.style.borderColor = 'rgba(248,113,113,0.5)';
+            cssBtn.title = `${errs.length} error${errs.length > 1 ? 's' : ''} — Line ${err.line}: ${err.message}. Click to cycle.`;
+            editor.scrollToLine(err.line - 1, true, true);
+            editor.selection.moveCursorToPosition({ row: err.line - 1, column: 0 });
+            showToast(`Found ${errs.length} CSS error${errs.length > 1 ? 's' : ''} — Line ${err.line}: ${err.message}`, 'error', 7000);
+          }
+        }
+      });
+
+      editor.session.on('change', resetCssBtn);
+    }
+
+    // Order: copy | format | wrap | expand | css-validate (if enabled)
     toolbar.appendChild(copyBtn);
     toolbar.appendChild(fmtBtn);
     toolbar.appendChild(wrapBtn);
     toolbar.appendChild(expandBtn);
+    if (cssBtn && settings && settings.cssValidate !== false) toolbar.appendChild(cssBtn);
     document.body.appendChild(toolbar);
 
     applyBtnStyle(copyBtn);
     applyBtnStyle(fmtBtn);
     applyBtnStyle(wrapBtn);
     applyBtnStyle(expandBtn);
+    if (cssBtn && settings && settings.cssValidate !== false) applyBtnStyle(cssBtn);
 
     const state = {
-      toolbar, copyBtn, fmtBtn, wrapBtn, expandBtn,
+      toolbar, copyBtn, fmtBtn, wrapBtn, expandBtn, cssBtn,
       wrapActive: wrapDefault,
       expandActive: expandDefault,
       hideTimer: null, isOverEl: false, isOverToolbar: false, resizeObs: null,
@@ -359,6 +530,17 @@
         applyBtnStyle(state.expandBtn);
         setWrapStyle(state.wrapBtn, state.wrapActive);
         setExpandStyle(state.expandBtn, state.expandActive);
+        if (state.cssBtn) {
+          const cssValidate = !!(settings && settings.cssValidate !== false);
+          if (cssValidate && !state.cssBtn.parentElement) {
+            state.toolbar.appendChild(state.cssBtn);
+            applyBtnStyle(state.cssBtn);
+          } else if (!cssValidate && state.cssBtn.parentElement) {
+            state.toolbar.removeChild(state.cssBtn);
+          } else if (cssValidate) {
+            applyBtnStyle(state.cssBtn);
+          }
+        }
         if (parseFloat(state.toolbar.style.opacity) > 0) positionToolbar(state.toolbar, el);
       }
     });

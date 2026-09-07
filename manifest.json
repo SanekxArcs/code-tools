@@ -30,6 +30,11 @@
       "js": ["ace-page.js"],
       "world": "MAIN",
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["css-validate.js"],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
